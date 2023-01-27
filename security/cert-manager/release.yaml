@@ -1,0 +1,33 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  releaseName: cert-manager
+  chart:
+    spec:
+      chart: cert-manager
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+        namespace: cert-manager
+      version: "1.11.*"
+  interval: 30m0s
+  install:
+    remediation:
+      retries: 3
+  values:
+    installCRDs: true
+    image:
+      repository: quay.io/jetstack/cert-manager-controller
+    webhook:
+      image:
+        repository: quay.io/jetstack/cert-manager-webhook
+    cainjector:
+      image:
+        repository: quay.io/jetstack/cert-manager-cainjector
+    startupapicheck:
+      image:
+        repository: quay.io/jetstack/cert-manager-ctl

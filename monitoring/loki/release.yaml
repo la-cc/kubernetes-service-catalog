@@ -1,0 +1,35 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  releaseName: loki
+  chart:
+    spec:
+      chart: loki
+      sourceRef:
+        kind: HelmRepository
+        name: grafana-loki
+        namespace: monitoring
+      version: "4.4.*"
+  interval: 30m0s
+  targetNamespace: monitoring
+  install:
+    remediation:
+      retries: 3
+  values:
+    loki:
+      image:
+        registry: docker.io
+        repository: grafana/loki
+    serviceMonitor:
+      enabled: false
+    resources:
+      limits:
+        cpu: 100m
+        memory: 200Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi

@@ -1,0 +1,153 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  releaseName: kube-prometheus-stack
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: monitoring
+      version: "44.3.*"
+  interval: 30m0s
+  targetNamespace: monitoring
+  install:
+    disableWait: false
+    disableWaitForJobs: false
+    disableHooks: false
+    remediation:
+      retries: 10
+  upgrade:
+    remediation:
+      retries: 10
+  values:
+    prometheus:
+      prometheusSpec:
+        replicas: 1
+        retention: 30d
+        image:
+          registry: quay.io
+          repository: prometheus/prometheus
+        podAntiAffinity: soft
+        # use all PrometheusRule CRs from the cluster, not filtering by labels
+        ruleSelectorNilUsesHelmValues: false
+        podMonitorSelectorNilUsesHelmValues: false
+        serviceMonitorSelectorNilUsesHelmValues: false
+        probeSelectorNilUsesHelmValues: false
+        resources:
+          requests:
+            memory: 1500Mi
+            cpu: 500m
+          limits:
+            memory: 2000Mi
+            cpu: 1500m
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              accessModes: [ "ReadWriteOnce" ]
+              resources:
+                requests:
+                  storage: 25Gi
+    grafana:
+      admin:
+        existingSecret: grafana-admin-credentials
+        userKey: username
+        passwordKey: password
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256Mi
+        requests:
+          cpu: 150m
+          memory: 150Mi
+      ingress:
+        enabled: false
+      image:
+        repository: grafana/grafana
+      downloadDashboardsImage:
+        repository: curlimages/curl
+      initChownData:
+        image:
+          repository: busybox
+      sidecar:
+        image:
+          repository: quay.io/kiwigrid/k8s-sidecar
+        enableUniqueFilenames: true
+        dashboards:
+          label: grafana-dashboard
+          folder: /dashboards
+          folderAnnotation: grafana-folder
+          provider:
+            folder: /dashboards
+            foldersFromFilesStructure: true
+          searchNamespace: ALL
+      deploymentStrategy:
+        type: Recreate
+      persistence:
+        enabled: true
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          access: proxy
+          url: "http://loki.monitoring.svc.cluster.local:3100"
+      envFromSecret: grafana-secrets
+      grafana.ini:
+        snapshots:
+          external_enabled: false
+        analytics:
+          check_for_updates: false
+          reporting_enabled: false
+        security:
+          cookie_secure: true
+          content_security_policy: true
+          disable_gravatar: true
+          strict_transport_security: true
+        server:
+          root_url: https://grafana.azure-cloud-dev.la-cc.de
+        auth.azuread:
+          enabled: true
+          allow_sign_up: true
+          scopes: openid email profile
+
+    prometheusOperator:
+      image:
+        registry: quay.io
+        repository: prometheus-operator/prometheus-operator
+      prometheusConfigReloader:
+        image:
+          registry: quay.io
+          repository: prometheus-operator/prometheus-config-reloader
+      admissionWebhooks:
+        enabled: true
+        patch:
+          image:
+            registry: k8s.gcr.io
+            repository: ingress-nginx/kube-webhook-certgen
+      thanosImage:
+        registry: quay.io
+        repository: thanos/thanos
+      resources:
+        requests:
+          memory: 400Mi
+          cpu: 150m
+        limits:
+          memory: 500Mi
+          cpu: 500m
+
+    kubeControllerManager:
+      enabled: false
+    defaultRules:
+      rules:
+        kubeScheduler: false
+      disabled:
+        KubeJobCompletion: true
+        KubeJobFailed: true
+        etcdInsufficientMembers: true
+
+    coreDns:
+      enabled: false
