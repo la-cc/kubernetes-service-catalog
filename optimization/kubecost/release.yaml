@@ -1,0 +1,50 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kubecost
+  namespace: kubecost
+spec:
+  releaseName: kubecost
+  chart:
+    spec:
+      chart: cost-analyzer
+      sourceRef:
+        kind: HelmRepository
+        name: kubecost
+        namespace: kubecost
+      version: "1.99.*"
+  interval: 30m0s
+  install:
+    remediation:
+      retries: 3
+  values:
+    global:
+      prometheus:
+        # If false, Prometheus will not be installed -- please read this before disabling: https://github.com/kubecost/docs/blob/main/custom-prom.md
+        enabled: false
+        # if false you have to add the address of a prometheus to connect to. Include protocol (http:// or https://) Ignored if enabled: true
+        fqdn: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+      grafana:
+        enabled: false
+        domainName: kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+        image:
+          repository: grafana/grafana
+          tag: 9.0.2
+          pullPolicy: IfNotPresent
+    prometheus:
+      image:
+      repository: quay.io/prometheus/alertmanager
+      pullPolicy: IfNotPresent
+      # node-export must be disabled if there is an existing daemonset: https://guide.kubecost.com/hc/en-us/articles/4407601830679-Troubleshoot-Install#a-name-node-exporter-a-issue-failedscheduling-kubecost-prometheus-node-exporter
+      nodeExporter:
+        enabled: false
+
+    kubecostFrontend:
+      image: "gcr.io/kubecost1/frontend"
+
+    kubecostModel:
+      image: "gcr.io/kubecost1/cost-model"
+      extraEnv:
+        - name: TEST
+          value: "Hello"
